@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import argparse
 import subprocess
 
@@ -61,6 +62,7 @@ def init_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--stack", "-s", help="specify the stack name", default="")
     parser.add_argument("--namespace", "-n", help="specify the namespace", required=True)
+    parser.add_argument("--trigger", "-t", help="specify the notification trigger timeout(in seconds)", default=30)
     return parser.parse_args()
 
 
@@ -80,6 +82,8 @@ def main():
             stack_name = check_unavailable_pods(output, stack_with_pods_down)
             if stack_name:
                 stack_with_pods_down.append(stack_name)
+                
+        time.sleep(int(args.trigger))
 
 
 if __name__ == '__main__':
