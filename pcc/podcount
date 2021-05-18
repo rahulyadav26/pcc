@@ -31,14 +31,15 @@ def send_notification(title, message):
 
 
 def check_unavailable_pods(item, stack_with_pods_down):
-    stack_name = item['metadata']['annotations']['meta.helm.sh/release-name']
+    stack_name = extract_stack_name(item)
 
     if 'unavailableReplicas' in item['status']:
 
         if 'availableReplicas' in item['status']:
 
             title = PODS_UNAVAILABLE_TITLE % item['status']['unavailableReplicas']
-            message = PODS_UNAVAILABLE_MESSAGE % (item['status']['unavailableReplicas'], item['status']['replicas'], stack_name)
+            message = PODS_UNAVAILABLE_MESSAGE % (
+            item['status']['unavailableReplicas'], item['status']['replicas'], stack_name)
 
         else:
 
@@ -60,32 +61,62 @@ def check_unavailable_pods(item, stack_with_pods_down):
         return None
 
 
+def build_kube_query(args):
+    base_query = ["kubectl", "get", "deployments", "-n", args.namespace, "-o", "json"]
+    stack_filter = ["--field-selector", "metadata.name=" + args.stack]
+    if args.stack != "":
+        base_query.extend(stack_filter)
+    return base_query
+
+
+def extract_stack_name(stack_info):
+    return stack_info['metadata']['name']
+
+
+def load_data_set(query):
+    return json.loads(subprocess.check_output(query))
+
+
+def prune_data_set(data_set, exclusion_patterns):
+    if exclusion_patterns is None:
+        return data_set
+
+    data_set['items'] = [item for item in data_set['items'] if
+                         not is_stack_excluded(extract_stack_name(item), exclusion_patterns)]
+    return data_set
+
+
+def is_stack_excluded(stack_name, exclusion_patterns):
+    if exclusion_patterns is None:
+        return False
+
+    if any(exclusion_pattern.lower() in stack_name.lower() for exclusion_pattern in exclusion_patterns):
+        return True
+    return False
+
+
 def init_arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stack", "-s", help="specify the stack name", default="")
     parser.add_argument("--namespace", "-n", help="specify the namespace", required=True)
-    parser.add_argument("--trigger", "-t", help="specify the notification trigger timeout(in second)", default=30)
+    parser.add_argument("--stack", "-s", help="specify the stack name", default="")
+    parser.add_argument("--frequency", "-f", help="specify the notification trigger frequency(in seconds)", default=30)
+    parser.add_argument("--exclude-stacks", "-e",
+                        help="specify comma separated stack names to be excluded, partial matching supported")
     return parser.parse_args()
 
 
 def main():
     args = init_arg_parser()
     stack_with_pods_down = list()
+    base_kube_query = build_kube_query(args)
     while True:
-        if args.stack == "":
-            output = json.loads(subprocess.check_output(["kubectl", "get", "deployments", "-n", args.namespace, "-o", "json"]))
-            for item in output['items']:
-                stack_name = check_unavailable_pods(item, stack_with_pods_down)
-                if stack_name:
-                    stack_with_pods_down.append(stack_name)
-
-        else:
-            output = json.loads(subprocess.check_output(["kubectl", "get", "deploy", args.stack, "-n", args.namespace, "-o", "json"]))
-            stack_name = check_unavailable_pods(output, stack_with_pods_down)
+        output = prune_data_set(load_data_set(base_kube_query), args.exclude_stacks)
+        for item in output['items']:
+            stack_name = check_unavailable_pods(item, stack_with_pods_down)
             if stack_name:
                 stack_with_pods_down.append(stack_name)
-                
-        time.sleep(int(args.trigger))
+
+        time.sleep(int(args.frequency))
 
 
 if __name__ == '__main__':
