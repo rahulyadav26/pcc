@@ -22,6 +22,8 @@ ALL_PODS_UP_TITLE = "All Pods are Up"
 
 ALL_PODS_UP_MESSAGE = "All Pods are Up for stack %s"
 
+KUBE_ENTITY_NAME_FILTER_TEMPLATE = "metadata.name=%s"
+
 
 def send_notification(title, message):
     cmd = OSASCRIPT_SEND_NOTIFICATION.format(message, title)
@@ -61,8 +63,8 @@ def check_unavailable_pods(item, stack_with_pods_down):
 
 def build_kube_query(args):
     base_query = ["kubectl", "get", "deployments", "-n", args.namespace, "-o", "json"]
-    stack_filter = ["--field-selector", "metadata.name=" + args.stack]
-    if args.stack != "":
+    stack_filter = ["--field-selector", KUBE_ENTITY_NAME_FILTER_TEMPLATE % args.stack]
+    if args.stack:
         base_query.extend(stack_filter)
     return base_query
 
