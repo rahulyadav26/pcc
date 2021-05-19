@@ -108,14 +108,14 @@ def init_arg_parser():
 
 def main():
     args = init_arg_parser()
-    stack_with_pods_down = list()
+    stack_with_pods_down = set()
     base_kube_query = build_kube_query(args)
     while True:
         output = prune_data_set(load_data_set(base_kube_query), args.exclude_stacks)
         for item in output['items']:
             stack_name = check_unavailable_pods(item, stack_with_pods_down)
             if stack_name:
-                stack_with_pods_down.append(stack_name)
+                stack_with_pods_down.add(stack_name)
 
         time.sleep(int(args.frequency))
 
