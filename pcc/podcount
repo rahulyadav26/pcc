@@ -70,20 +70,20 @@ def init_arg_parser():
 
 def main():
     args = init_arg_parser()
-    stack_with_pods_down = list()
+    stack_with_pods_down = set()
     while True:
         if args.stack == "":
             output = json.loads(subprocess.check_output(["kubectl", "get", "deployments", "-n", args.namespace, "-o", "json"]))
             for item in output['items']:
                 stack_name = check_unavailable_pods(item, stack_with_pods_down)
                 if stack_name:
-                    stack_with_pods_down.append(stack_name)
+                    stack_with_pods_down.add(stack_name)
 
         else:
             output = json.loads(subprocess.check_output(["kubectl", "get", "deploy", args.stack, "-n", args.namespace, "-o", "json"]))
             stack_name = check_unavailable_pods(output, stack_with_pods_down)
             if stack_name:
-                stack_with_pods_down.append(stack_name)
+                stack_with_pods_down.add(stack_name)
                 
         time.sleep(int(args.trigger))
 
